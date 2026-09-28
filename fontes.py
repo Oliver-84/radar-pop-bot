@@ -502,6 +502,132 @@ def buscar_gq():
 
     return noticias
 
+
+def buscar_pubity():
+    url = "https://pubity.com/entertainment/"
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Linux; Android 11) "
+            "AppleWebKit/537.36 "
+            "Chrome/140.0 Mobile Safari/537.36"
+        )
+    }
+
+    ultimo_erro = None
+
+    for tentativa in range(3):
+        try:
+            resposta = requests.get(
+                url,
+                headers=headers,
+                timeout=20,
+            )
+
+            resposta.raise_for_status()
+            break
+
+        except Exception as e:
+            ultimo_erro = e
+
+            if tentativa < 2:
+                time.sleep(3)
+
+    else:
+        raise RuntimeError(
+            f"Falha ao consultar Pubity: {ultimo_erro}"
+        )
+
+    soup = BeautifulSoup(
+        resposta.text,
+        "html.parser"
+    )
+
+    noticias = []
+    urls_vistas = set()
+
+    for link_tag in soup.find_all("a", href=True):
+        href = link_tag.get("href", "").strip()
+
+        if not href.startswith("https://pubity.com/"):
+            continue
+
+        # Ignora páginas institucionais/editorias.
+        caminho = href.replace(
+            "https://pubity.com/",
+            ""
+        ).strip("/")
+
+        if not caminho:
+            continue
+
+        if caminho in {
+            "entertainment",
+            "sport",
+            "gaming",
+            "lifestyle",
+            "about",
+            "contact",
+            "privacy-policy",
+        }:
+            continue
+
+        # A Pubity repete links de matérias para título/data.
+        if href in urls_vistas:
+            continue
+
+        titulo = link_tag.get_text(
+            " ",
+            strip=True
+        )
+
+        # Evita usar datas e outros links auxiliares como título.
+        if len(titulo) < 15:
+            continue
+
+        if titulo.lower().startswith(
+            (
+                "january ",
+                "february ",
+                "march ",
+                "april ",
+                "may ",
+                "june ",
+                "july ",
+                "august ",
+                "september ",
+                "october ",
+                "november ",
+                "december ",
+            )
+        ):
+            continue
+
+        urls_vistas.add(href)
+
+        imagem = ""
+        imagem_tag = link_tag.find("img")
+
+        if imagem_tag:
+            imagem = (
+                imagem_tag.get("src")
+                or imagem_tag.get("data-src")
+                or ""
+            ).strip()
+
+        noticias.append({
+            "fonte": "Pubity",
+            "titulo": titulo,
+            "url": href,
+            "publicado_em": "",
+            "idioma": "en",
+            "categoria": "Entertainment",
+            "imagem": imagem,
+        })
+
+    return noticias
+
+
 def buscar_todas():
     coletores = [
         ("Den of Geek", buscar_den_of_geek),
@@ -509,6 +635,7 @@ def buscar_todas():
         ("CNN Pop", buscar_cnn_pop),
         ("AdoroCinema", buscar_adorocinema),
         ("GQ", buscar_gq),
+        ("Pubity", buscar_pubity),
     ]
 
     todas = []
